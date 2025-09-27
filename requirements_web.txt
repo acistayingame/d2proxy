@@ -1,0 +1,5 @@
+Flask>=2.0.0
+Werkzeug>=2.0.0
+paramiko>=2.7.0
+requests>=2.25.0
+

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protocol scanner - Веб-панель</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-search"></i> Protocol scanner
+            </a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="/history">
+                    <i class="fas fa-history"></i> История
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <!-- Форма сканирования -->
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-search"></i> Введите данные от сервера чтобы начать сканирование</h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="scanForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="target" class="form-label">Целевой хост *</label>
+                                        <input type="text" class="form-control" id="target" name="target" 
+                                               placeholder="192.168.1.100" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                        </label>
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle"></i> 
+                                            <strong>Сканирование всех портов (1-65535)</strong><br>
+                                            <small>3 параллельных потока • Агрессивный метод </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="username" class="form-label">Имя пользователя</label>
+                                        <input type="text" class="form-control" id="username" name="username" 
+                                               placeholder="admin (необязательно)">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="password" class="form-label">Пароль</label>
+                                        <input type="password" class="form-control" id="password" name="password" 
+                                               placeholder="password123 (необязательно)">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="mb-3 d-flex justify-content-center">
+                                        <button type="submit" class="btn btn-primary btn-lg" id="scanBtn">
+                                            <i class="fas fa-rocket"></i> Начать сканирование
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Статус сканирования -->
+                <div class="card mt-4" id="statusCard" style="display: none;">
+                    <div class="card-header">
+                        <h5><i class="fas fa-info-circle"></i> Статус сканирования</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress mb-3">
+                            <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div id="statusText">Подготовка к сканированию...</div>
+                        <div class="mt-3">
+                            <button class="btn btn-danger" id="stopBtn" style="display: none;">
+                                <i class="fas fa-stop"></i> Остановить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Результаты сканирования -->
+        <div class="row mt-4" id="resultsSection" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-list"></i> Результаты сканирования</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="resultsContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для ошибок -->
+    <div class="modal fade" id="errorModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Ошибка</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="errorMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для управления SSH -->
+    <div class="modal fade" id="sshManagementModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-terminal"></i> Управление SSH подключением</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Подключение к:</label>
+                            <input type="text" class="form-control" id="sshTarget" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Порт:</label>
+                            <input type="text" class="form-control" id="sshPort" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">SSH Терминал:</label>
+                        <div id="sshTerminal" style="height: 400px; border: 1px solid #ccc; background: #000;"></div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Введите логин и пароль для подключения к серверу.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для управления RDP -->
+    <div class="modal fade" id="rdpManagementModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-desktop"></i> Управление RDP подключением</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Подключение к:</label>
+                            <input type="text" class="form-control" id="rdpTarget" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Порт:</label>
+                            <input type="text" class="form-control" id="rdpPort" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">RDP Рабочий стол:</label>
+                        <div id="rdpCanvas" style="height: 400px; border: 1px solid #ccc; background: #f0f0f0; position: relative;">
+                            <div id="rdpStatus" class="position-absolute top-50 start-50 translate-middle text-center">
+                                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                                <p>Подключение к RDP серверу...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Подключение к удаленному рабочему столу Windows.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для управления VNC -->
+    <div class="modal fade" id="vncManagementModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-eye"></i> Управление VNC подключением</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Подключение к:</label>
+                            <input type="text" class="form-control" id="vncTarget" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Порт:</label>
+                            <input type="text" class="form-control" id="vncPort" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">VNC Рабочий стол:</label>
+                        <div id="vncCanvas" style="height: 400px; border: 1px solid #ccc; background: #f0f0f0; position: relative;">
+                            <div id="vncStatus" class="position-absolute top-50 start-50 translate-middle text-center">
+                                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                                <p>Подключение к VNC серверу...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Подключение к удаленному рабочему столу через VNC.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- xterm.js для веб-терминала -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
+    
+    <!-- noVNC для VNC -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/novnc@1.4.0/lib/styles/novnc.css" />
+    <script src="https://cdn.jsdelivr.net/npm/novnc@1.4.0/lib/rfb.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
